@@ -6,10 +6,11 @@ The pool holds 1 million DVT tokens. You have nothing.
 To pass this challenge, rescue all funds in the pool executing a single transaction. Deposit the funds into the designated recovery account.
 
 ### **Solution:**
-flashloan function takes in input the target address of the contract that will be called to repay the debt.
-To do so, it calls directly `target.functionCall(data)` from address library of OpenZeppelin. It does not check which type of contract we passed as target.
-We take advantage to instantiate a fl with amount of 0 token to borrow and we pass as target the address of the token and as data the function signature of the approve function.
-In this way, `TrusterLenderPool` will approve tokens to our contract and we will be able to transfer all the tokens from the pool to our contract.
+The flashloan function takes the target contract address as an input, which will be responsible for repaying the debt. The function directly calls target.functionCall(data) from the Address library of OpenZeppelin, without validating the type of contract at the target address.
+
+We exploit this behavior by initiating a flashloan with a borrowed amount of 0 tokens. We pass the address of the token contract as the target and provide the function signature of the approve function as the data. This results in the TrusterLenderPool contract approving tokens to our contract.
+
+With this approval in place, our contract is able to transfer the entire token balance from the pool to itself, effectively bypassing the intended security checks.
 
 ### **Code:**
 ```javascript
