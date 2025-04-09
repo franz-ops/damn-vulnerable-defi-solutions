@@ -88,7 +88,7 @@ contract SideEntranceAttacker is IFlashLoanEtherReceiver {
 ```
 
 ## **Mitigation:**
-Considere using a lock mechanism to prevent user to call deposit during a flashloan.
+Consider using a lock mechanism to prevent user to call deposit during a flashloan.
 
 ```diff
 function flashLoan(uint256 amount) external {
