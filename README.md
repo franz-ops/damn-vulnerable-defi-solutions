@@ -1,4 +1,4 @@
-# Truster
+# 3 - Truster
 
 ## **Problem:**
 More and more lending pools are offering flashloans. In this case, a new pool has launched that is offering flashloans of DVT tokens for free.
