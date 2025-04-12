@@ -35,6 +35,7 @@ contract SimpleGovernance is ISimpleGovernance {
 
         actionId = _actionCounter;
 
+        //@audit-high no check on what is the target.. so it the action is approved, it could execute any function on any contract
         _actions[actionId] = GovernanceAction({
             target: target,
             value: value,
@@ -90,6 +91,8 @@ contract SimpleGovernance is ISimpleGovernance {
         if (actionToExecute.proposedAt == 0) return false;
 
         uint64 timeDelta;
+
+        //q could go under-overflow?
         unchecked {
             timeDelta = uint64(block.timestamp) - actionToExecute.proposedAt;
         }

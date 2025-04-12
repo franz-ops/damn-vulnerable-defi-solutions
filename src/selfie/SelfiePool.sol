@@ -56,11 +56,14 @@ contract SelfiePool is IERC3156FlashLender, ReentrancyGuard {
             revert UnsupportedCurrency();
         }
 
+        //q should check if contract can transfer the amount requested?
+
         token.transfer(address(_receiver), _amount);
         if (_receiver.onFlashLoan(msg.sender, _token, _amount, 0, _data) != CALLBACK_SUCCESS) {
             revert CallbackFailed();
         }
 
+        //q are you sure this check works?
         if (!token.transferFrom(address(_receiver), address(this), _amount)) {
             revert RepayFailed();
         }
