@@ -89,7 +89,6 @@ contract CompromisedChallenge is Test {
 
         vm.startPrank(player);
         exchange.buyOne{value: 0.00001 ether}();
-        //exchange.buyOne{value: 0.00001 ether}();
         vm.stopPrank();
 
         console.log("NFT bought by player: ", nft.balanceOf(player));
@@ -105,8 +104,7 @@ contract CompromisedChallenge is Test {
         vm.startPrank(player);
         nft.approve(address(exchange), 0);
         exchange.sellOne(0);
-        //nft.approve(address(exchange), 1);
-        //exchange.sellOne(1);
+        
         console.log("NFT sold by player: ", nft.balanceOf(player));
         console.log("Exchange balance: ", address(exchange).balance);
         (bool success, ) = recovery.call{value: EXCHANGE_INITIAL_ETH_BALANCE}("");
