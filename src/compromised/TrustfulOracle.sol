@@ -82,6 +82,10 @@ contract TrustfulOracle is AccessControlEnumerable {
         emit UpdatedPrice(source, symbol, oldPrice, newPrice);
     }
 
+    //q is this to poor to be a median? 3 sources; 
+    // it Left = 0 Center = 0 Right = 999;
+    //  uint256 leftPrice = prices[(prices.length / 2) - 1]; = 3/2 - 1 = 1 - 1 = 0 
+    //  uint256 rightPrice = prices[prices.length / 2]; = 
     function _computeMedianPrice(string memory symbol) private view returns (uint256) {
         uint256[] memory prices = getAllPricesForSymbol(symbol);
         LibSort.insertionSort(prices);

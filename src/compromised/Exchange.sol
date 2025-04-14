@@ -33,6 +33,7 @@ contract Exchange is ReentrancyGuard {
         }
 
         // Price should be in [wei / NFT]
+        //q the only check is to see if the payment is greater than the price? no checks on the oracle price?
         uint256 price = oracle.getMedianPrice(token.symbol());
         if (msg.value < price) {
             revert InvalidPayment();

